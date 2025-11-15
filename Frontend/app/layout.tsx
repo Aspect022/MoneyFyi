@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({
@@ -87,7 +86,6 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="light" storageKey="moneyfyi-theme">
           {children}
           <MobileBottomNav />
-          <PWAInstallPrompt />
         </ThemeProvider>
         <Analytics />
       </body>
