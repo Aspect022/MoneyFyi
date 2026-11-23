@@ -25,7 +25,7 @@ export default function LandingPage() {
               </h1>
               
               <p className="text-balance text-xl text-muted-foreground leading-relaxed">
-                Upload bank statements, invoices, and UPI logs. Get fraud alerts, GST compliance checks, and cashflow forecasts — automatically.
+                Upload bank statements and invoices. Get fraud alerts, GST compliance checks, and cashflow forecasts — automatically.
               </p>
               
               <div className="flex flex-wrap items-center gap-4">

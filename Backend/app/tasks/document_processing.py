@@ -29,7 +29,16 @@ async def process_document_task(document_id: str, user_id: UUID):
             return
         
         document = doc_response.data[0]
-        storage_path = document["storage_path"]
+        file_url = document["file_url"]
+        
+        # Extract storage path from URL or reconstruct it
+        # file_url format: https://[project].supabase.co/storage/v1/object/public/documents/[path]
+       # We can download using the path from the URL
+        storage_path = file_url.split('/documents/')[-1] if '/documents/' in file_url else None
+        
+        if not storage_path:
+            logger.error(f"Could not extract storage path from URL: {file_url}")
+            return
         
         # Update status to processing
         supabase.table("documents").update({
@@ -83,7 +92,6 @@ async def process_document_task(document_id: str, user_id: UUID):
         logger.exception(f"Error processing document {document_id}")
         supabase.table("documents").update({
             "status": "failed",
-            "error_message": str(e),
             "processed_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", document_id).execute()
 

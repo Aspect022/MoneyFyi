@@ -11,7 +11,8 @@ logger = logging.getLogger("moneyfyi.backend.gemini")
 class GeminiService:
     def __init__(self):
         genai.configure(api_key=settings.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Using gemini-pro-vision for image/document analysis
+        self.model = genai.GenerativeModel('gemini-pro-vision')
         
         # Configure safety settings to be less restrictive for financial docs
         self.safety_settings = {

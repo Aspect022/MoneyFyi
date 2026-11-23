@@ -42,12 +42,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from .routers import user, documents, transactions, alerts, insights
+from .routers import user, documents, transactions, alerts, insights, encrypted_transactions
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(insights.router, prefix="/api/v1")
+app.include_router(encrypted_transactions.router, prefix="/api/v1")
 
 
 
@@ -56,7 +57,10 @@ app.include_router(insights.router, prefix="/api/v1")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://money-fyi.vercel.app"],
+    allow_origins=[
+        "https://money-fyi.vercel.app",
+        "http://localhost:3000",  # Local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -73,7 +73,7 @@ export default function UploadPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  const simulateUpload = (file: File) => {
+  const uploadToBackend = async (file: File) => {
     const id = Math.random().toString(36).substring(7)
     const uploadFile: UploadFile = {
       id,
@@ -84,51 +84,83 @@ export default function UploadPage() {
 
     setUploadingFiles((prev) => [...prev, uploadFile])
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
+    try {
+      // Create FormData
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('document_type', file.type.includes('pdf') ? 'bank_statement' : 'invoice')
+
+      // Import API client dynamically
+      const { apiClient } = await import('@/lib/api/client')
+
+      // Upload with progress simulation
       setUploadingFiles((prev) =>
-        prev.map((f) => {
-          if (f.id !== id) return f
-
-          if (f.progress < 100) {
-            return { ...f, progress: Math.min(f.progress + 10, 100) }
-          } else if (f.status === 'uploading') {
-            return { ...f, status: 'processing' }
-          } else if (f.status === 'processing') {
-            return { ...f, status: 'analyzing' }
-          } else if (f.status === 'analyzing') {
-            return { ...f, status: 'completed' }
-          }
-          return f
-        })
+        prev.map((f) => (f.id === id ? { ...f, progress: 30 } : f))
       )
-    }, 500)
 
-    // Move to history after completion
-    setTimeout(() => {
-      clearInterval(interval)
-      setUploadingFiles((prev) => prev.filter((f) => f.id !== id))
-      
-      const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('csv') ? 'csv' : 'image'
-      
-      setUploadHistory((prev) => [
-        {
-          id,
-          name: file.name,
-          date: new Date().toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
-          status: 'completed',
-          size: formatFileSize(file.size),
-          type: fileType,
-        },
-        ...prev,
-      ])
-    }, 4000)
+      // Call backend API
+      const result = await apiClient.uploadDocument(formData)
+
+      // Update to processing
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, progress: 60, status: 'processing' } : f))
+      )
+
+      // Simulate processing wait (backend will process in background)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      // Update to analyzing
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, progress: 90, status: 'analyzing' } : f))
+      )
+
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      // Mark as completed
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, progress: 100, status: 'completed' } : f))
+      )
+
+      // Move to history after completion
+      setTimeout(() => {
+        setUploadingFiles((prev) => prev.filter((f) => f.id !== id))
+
+        const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('csv') ? 'csv' : 'image'
+
+        setUploadHistory((prev) => [
+          {
+            id: result.id || id,
+            name: file.name,
+            date: new Date().toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            status: 'completed',
+            size: formatFileSize(file.size),
+            type: fileType,
+          },
+          ...prev,
+        ])
+      }, 1000)
+
+    } catch (error) {
+      console.error('Upload failed:', error)
+
+      // Mark as failed
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: 'failed', progress: 0 } : f))
+      )
+
+      // Remove from uploading after showing error
+      setTimeout(() => {
+        setUploadingFiles((prev) => prev.filter((f) => f.id !== id))
+      }, 3000)
+
+      alert(`Failed to upload ${file.name}. Please try again.`)
+    }
   }
 
   const onDrop = (acceptedFiles: File[], rejectedFiles: any[]) => {
@@ -146,7 +178,7 @@ export default function UploadPage() {
 
     // Process accepted files
     acceptedFiles.forEach((file) => {
-      simulateUpload(file)
+      uploadToBackend(file)
     })
   }
 
@@ -201,7 +233,7 @@ export default function UploadPage() {
             >
               <FileUp className="h-12 w-12 text-primary sm:h-16 sm:w-16" />
             </motion.div>
-            
+
             <div className="space-y-2">
               <h3 className="text-xl font-semibold sm:text-2xl">
                 {isDragActive ? 'Drop your files here' : 'Drag & Drop Your Files Here'}
@@ -250,9 +282,9 @@ export default function UploadPage() {
             {uploadingFiles.map((uploadFile) => {
               const Icon = getFileIcon(
                 uploadFile.file.type.includes('pdf') ? 'pdf' :
-                uploadFile.file.type.includes('csv') ? 'csv' : 'image'
+                  uploadFile.file.type.includes('csv') ? 'csv' : 'image'
               )
-              
+
               return (
                 <motion.div
                   key={uploadFile.id}
@@ -263,7 +295,7 @@ export default function UploadPage() {
                   <Card className="p-4">
                     <div className="flex items-start gap-3">
                       <Icon className="h-10 w-10 shrink-0 text-primary" />
-                      
+
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
@@ -443,7 +475,7 @@ export default function UploadPage() {
                     <Card className="p-4">
                       <div className="flex items-start gap-3">
                         <Icon className="h-10 w-10 shrink-0 text-primary" />
-                        
+
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="space-y-1">
                             <p className="font-medium leading-tight">{item.name}</p>

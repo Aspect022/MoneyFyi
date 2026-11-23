@@ -2,7 +2,8 @@ from typing import Any, List
 from uuid import UUID
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, UploadFile, File, Form
+import logging
 from supabase import Client
 
 from ..database import get_supabase
@@ -10,36 +11,72 @@ from ..dependencies import get_current_user_id
 from ..models import Document
 from ..schemas import DocumentResponse, DocumentCreate
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from ..services.gemini_service import gemini_service
-# We'll need a task function, let's define it in a new file or here for now. 
-# Better to put it in a separate module to avoid circular imports if possible, 
-# but for prototype let's keep it simple. We'll create a tasks module.
-
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+logger = logging.getLogger("moneyfyi.backend.documents")
 
 # Placeholder for the task import
 # from ..tasks.document_processing import process_document_task
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-async def create_document(
-    document: DocumentCreate,
-    background_tasks: BackgroundTasks,
+async def upload_document(
+    file: UploadFile = File(...),
+    document_type: str = Form("bank_statement"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: UUID = Depends(get_current_user_id),
     supabase: Client = Depends(get_supabase)
 ) -> Any:
     """
-    Create a new document record.
-    This is called AFTER the file has been uploaded to Supabase Storage by the frontend.
+    Upload a document file (PDF, image, CSV).
+    The file is uploaded to Supabase Storage and then processed via OCR.
     """
     
-    data = document.model_dump()
-    data["user_id"] = str(user_id)
-    data["status"] = "uploaded"
-    data["uploaded_at"] = datetime.now(timezone.utc).isoformat()
-    data["extracted_data"] = {}
+    # Read file content
+    file_content = await file.read()
+    file_size = len(file_content)
     
-    response = supabase.table("documents").insert(data).execute()
+    # Sanitize filename - remove/replace invalid characters for Supabase Storage
+    import re
+    safe_filename = file.filename
+    # Replace spaces with underscores
+    safe_filename = safe_filename.replace(' ', '_')
+    # Remove brackets and other special characters, keep only alphanumeric, dots, hyphens, underscores
+    safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename)
+    
+    # Generate storage path with sanitized filename
+    file_ext = safe_filename.split('.')[-1] if '.' in safe_filename else 'bin'
+    storage_path = f"{user_id}/{datetime.now(timezone.utc).strftime('%Y/%m/%d')}/{safe_filename}"
+    
+    try:
+        # Upload to Supabase Storage
+        storage_response = supabase.storage.from_("documents").upload(
+            storage_path,
+            file_content,
+            {"content-type": file.content_type or "application/octet-stream"}
+        )
+        
+        # Get public URL
+        file_url = supabase.storage.from_("documents").get_public_url(storage_path)
+        
+    except Exception as e:
+        logger.error(f"Failed to upload to storage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file to storage: {str(e)}"
+        )
+    
+    # Create document record
+    doc_data = {
+        "user_id": str(user_id),
+        "file_name": file.filename,
+        "file_type": file.content_type or "application/octet-stream",
+        "file_size": file_size,
+        "file_url": file_url,
+        "status": "processing",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    response = supabase.table("documents").insert(doc_data).execute()
     
     if not response.data:
         raise HTTPException(
@@ -50,7 +87,6 @@ async def create_document(
     doc_record = response.data[0]
     
     # Trigger background processing
-    # We need to import the task function dynamically or from a separate module
     from ..tasks.document_processing import process_document_task
     background_tasks.add_task(process_document_task, doc_record["id"], user_id)
     

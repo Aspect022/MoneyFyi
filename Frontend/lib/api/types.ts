@@ -3,12 +3,17 @@ export interface Transaction {
   date: string
   vendor_name: string
   amount: number
-  type: 'credit' | 'debit'
-  mode: 'UPI' | 'NEFT' | 'RTGS' | 'Cheque' | 'Card'
-  category: string
-  description: string
-  flagged: boolean
-  risk_score?: number
+  transaction_type: 'UPI' | 'NEFT' | 'RTGS' | 'IMPS' | 'CHEQUE' | 'CASH'
+  category?: string
+  description?: string
+  status?: 'completed' | 'pending' | 'failed'
+  is_flagged: boolean
+  flag_reason?: string
+  risk_level?: 'low' | 'medium' | 'high' | 'critical'
+  reference_number?: string
+  user_id: string
+  created_at: string
+  updated_at?: string
 }
 
 export interface Anomaly {

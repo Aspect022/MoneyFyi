@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     
     # Notifications
     n8n_webhook_url: str = Field("https://n8n.example.com/webhook/alert", alias="N8N_WEBHOOK_URL")
+    
+    # Encryption
+    encryption_key: str = Field(..., description="Base64-encoded AES-256 key", alias="ENCRYPTION_KEY")
+    key_version: str = Field("v1", description="Encryption key version", alias="KEY_VERSION")
+    encrypted_bucket_name: str = Field("encrypted-files", description="Supabase bucket for encrypted files", alias="ENCRYPTED_BUCKET_NAME")
 
 
 def get_settings() -> Settings:

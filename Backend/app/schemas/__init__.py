@@ -108,13 +108,12 @@ class DocumentResponse(BaseModel):
     file_name: str
     file_type: str
     file_size: int
-    storage_path: str
-    document_type: str
+    file_url: str  # Changed from storage_path
     status: str
-    extracted_data: Dict[str, Any]
-    error_message: Optional[str]
+    extracted_data: Optional[Dict[str, Any]] = None  # Made optional with default None
+    transaction_id: Optional[UUID] = None  # Added from actual schema
     uploaded_at: datetime
-    processed_at: Optional[datetime]
+    processed_at: Optional[datetime] = None
 
 
 class TransactionResponse(BaseModel):
